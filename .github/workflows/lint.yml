@@ -1,0 +1,24 @@
+name: Lint
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: ShellCheck
+        run: shellcheck cooldowns.sh
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Validate docs
+        run: uv run --with zensical zensical build
