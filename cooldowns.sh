@@ -7,15 +7,21 @@
 #   cooldowns.sh check                    Check cooldown status for all tools
 #
 # Examples:
-#   cooldowns.sh set pip 3d
+#   cooldowns.sh set pip 3d         # Uses P3D format if pip >= 26.1, else shell wrapper
 #   cooldowns.sh set uv "3 days"
 #   cooldowns.sh set npm 7d
 #   cooldowns.sh check
 #
+# Changelog:
+#   2026-05-07  Added pip 26.1+ duration format support (e.g. P3D)
+#
 # Supported tools: pip, uv, npm, pnpm, yarn, bun, deno, cargo
 #
 # Where configs are written:
-#   pip    Shell wrapper in /etc/profile.d/cooldowns.sh (or ~/.zshrc / ~/.bashrc)
+#   pip    Shell wrapper (pip < 26.1) or env var export (pip >= 26.1)
+#          in /etc/profile.d/cooldowns.sh (or ~/.zshrc / ~/.bashrc)
+#          - pip 26.1+ uses duration format: PIP_UPLOADED_PRIOR_TO="P3D"
+#          - pip < 26.1 uses shell wrapper with absolute timestamps
 #   uv     UV_EXCLUDE_NEWER export in /etc/profile.d/cooldowns.sh (or ~/.zshrc / ~/.bashrc)
 #   npm    min-release-age in ~/.npmrc
 #   pnpm   minimum-release-age in ~/.npmrc
@@ -43,19 +49,49 @@ set -euo pipefail
 case "$OSTYPE" in
     darwin*|*bsd*)
         SED_INPLACE=(sed -i '')
-        date_to_epoch()   { date -j -f '%Y-%m-%d' "$1" +%s 2>/dev/null; }
+        date_to_epoch()   { date -j -f '%Y-%m-%d' "$1" +%s 2>/dev/null || echo ""; }
         _date_days_ago()  { echo "date -u -v-${1}d '+%Y-%m-%dT%H:%M:%SZ'"; }
         # macOS chmod has no --reference; %OLp is permission bits (not full st_mode).
         copy_mode_from() { local src="$1" dest="$2"; chmod "$(stat -f %OLp "$src")" "$dest"; }
         ;;
     *)
         SED_INPLACE=(sed -i)
-        date_to_epoch()   { date -d "$1" +%s 2>/dev/null; }
+        date_to_epoch()   { date -d "$1" +%s 2>/dev/null || echo ""; }
         _date_days_ago()  { echo "date -u -d '$1 days ago' '+%Y-%m-%dT%H:%M:%SZ'"; }
         # GNU chmod: clone mode from SRC (see `chmod --help`).
         copy_mode_from() { local src="$1" dest="$2"; chmod --reference="$src" "$dest"; }
         ;;
 esac
+
+# ---------------------------------------------------------------------------
+# Version detection
+# ---------------------------------------------------------------------------
+
+# Get pip version (e.g., "26.1.0" -> "26.1.0")
+# Returns empty string if pip is not installed
+get_pip_version() {
+    if ! command -v pip &>/dev/null; then
+        echo ""
+        return 1
+    fi
+
+    local version
+    version=$(command pip --version 2>/dev/null | awk '{print $2; exit}')
+    echo "$version"
+}
+
+version_gte() {
+    local ver="$1" target="$2"
+    local -a v t
+    IFS=. read -ra v <<< "$ver"
+    IFS=. read -ra t <<< "$target"
+    local i
+    for i in "${!t[@]}"; do
+        [[ "${v[i]:-0}" -gt "${t[i]:-0}" ]] && return 0
+        [[ "${v[i]:-0}" -lt "${t[i]:-0}" ]] && return 1
+    done
+    return 0
+}
 
 # Extract the first `key = value` style value from a file. Tolerates an
 # optional `export ` prefix, whitespace around `=`, and surrounding quotes.
@@ -175,8 +211,17 @@ clean_previous() {
 
 set_pip() {
     local days="$1"
+    local pip_version
+    pip_version=$(get_pip_version) || pip_version=""
+
+    if [[ -z "$pip_version" ]]; then
+        echo "pip: not installed, skipping"
+        return
+    fi
+
     ensure_profile_dir
 
+    # Check for existing configs and skip if found (keep existing logic)
     if ! find_in_profiles "cooldowns:pip:start" &>/dev/null; then
         if [[ -n "${PIP_UPLOADED_PRIOR_TO:-}" ]]; then
             echo "pip: PIP_UPLOADED_PRIOR_TO is already set to '$PIP_UPLOADED_PRIOR_TO', skipping"
@@ -201,10 +246,20 @@ set_pip() {
 
     clean_previous pip "$PROFILE_SCRIPT"
 
-    local date_cmd
-    date_cmd=$(_date_days_ago "$days")
+    # Use duration format for pip >= 26.1
+    if [[ -n "$pip_version" ]] && version_gte "$pip_version" "26.1"; then
+        cat >> "$PROFILE_SCRIPT" << SHELL
+# cooldowns:pip:start
+export PIP_UPLOADED_PRIOR_TO="P${days}D"
+# cooldowns:pip:end
+SHELL
+        echo "pip: set PIP_UPLOADED_PRIOR_TO=\"P${days}D\" in $PROFILE_SCRIPT"
+    else
+        # Use shell wrapper for older pip or when pip is not installed
+        local date_cmd
+        date_cmd=$(_date_days_ago "$days")
 
-    cat >> "$PROFILE_SCRIPT" << SHELL
+        cat >> "$PROFILE_SCRIPT" << SHELL
 # cooldowns:pip:start
 pip() {
     local pip_major cutoff
@@ -226,11 +281,17 @@ pip() {
 }
 # cooldowns:pip:end
 SHELL
-    echo "pip: installed shell wrapper with ${days}-day cooldown in $PROFILE_SCRIPT"
+        echo "pip: installed shell wrapper with ${days}-day cooldown in $PROFILE_SCRIPT"
+        echo "  note: pip $pip_version uses absolute timestamps. Upgrade to pip 26.1+ for simpler duration format."
+    fi
 }
 
 set_uv() {
     local days="$1"
+    if ! command -v uv &>/dev/null; then
+        echo "uv: not installed, skipping"
+        return
+    fi
     local duration
     duration=$(duration_for_tool "$days" uv)
     ensure_profile_dir
@@ -359,6 +420,10 @@ set_bun() {
 
 set_deno() {
     local days="$1"
+    if ! command -v deno &>/dev/null; then
+        echo "deno: not installed, skipping"
+        return
+    fi
     local duration
     duration=$(duration_for_tool "$days" deno)
     ensure_profile_dir
@@ -376,6 +441,10 @@ SHELL
 
 set_cargo() {
     local days="$1"
+    if ! command -v cargo &>/dev/null; then
+        echo "cargo: not installed, skipping"
+        return
+    fi
     local minutes
     minutes=$(duration_for_tool "$days" cargo)
     ensure_profile_dir
@@ -399,7 +468,9 @@ set_cargo() {
 export COOLDOWN_MINUTES="$minutes"
 # cooldowns:cargo:end
 SHELL
-    echo "cargo: set COOLDOWN_MINUTES=$minutes in $PROFILE_SCRIPT (requires cargo-cooldown)"
+    echo "cargo: set COOLDOWN_MINUTES=$minutes in $PROFILE_SCRIPT"
+    echo "  note: cargo has no native cooldown support. You must use 'cargo cooldown <command>' instead of 'cargo <command>'."
+    echo "  Install the crate with: cargo install cargo-cooldown"
 }
 
 do_set() {
@@ -465,28 +536,53 @@ check_date_staleness() {
 
 check_pip() {
     local profile_file
+
+    # Check for marked section in profile files (new or old approach)
     if profile_file=$(find_in_profiles "cooldowns:pip:start"); then
-        local days
-        # GNU date embeds "N days ago" in the emitted command; BSD/macOS uses -v-Nd.
-        days=$(grep -Eo '[0-9]+ days ago' "$profile_file" 2>/dev/null | head -1 | awk '{ print $1 }') || true
-        if [[ -z "$days" ]]; then
-            days=$(grep -Eo -- '-v-[0-9]+d' "$profile_file" 2>/dev/null | head -1 | sed -e 's/-v-//' -e 's/d//') || true
-        fi
-        if [[ -n "$days" ]]; then
-            record pip $STATUS_OK "shell wrapper with ${days}-day cooldown in $profile_file"
+        # Determine if it's an env var export (duration format) or shell wrapper
+        if grep -q "export PIP_UPLOADED_PRIOR_TO=" "$profile_file" 2>/dev/null; then
+            local val sourced=""
+            val=$(extract_kv PIP_UPLOADED_PRIOR_TO "$profile_file" || echo "")
+            [[ -z "${PIP_UPLOADED_PRIOR_TO:-}" ]] && sourced=" (not yet sourced)"
+            if [[ "$val" =~ ^P[0-9]+D$ ]]; then
+                local days="${val:1:-1}"
+                record pip $STATUS_OK "PIP_UPLOADED_PRIOR_TO='$val' (${days}-day cooldown) in $profile_file$sourced"
+            elif [[ "$val" =~ ^P[0-9YMWDTHS]+$ ]]; then
+                record pip $STATUS_OK "PIP_UPLOADED_PRIOR_TO='$val' (duration) in $profile_file$sourced"
+            else
+                check_date_staleness pip "PIP_UPLOADED_PRIOR_TO='$val' in $profile_file$sourced" "$val"
+            fi
         else
-            record pip $STATUS_OK "shell wrapper with cooldown in $profile_file"
+            # Shell wrapper - extract days from wrapper code
+            local days
+            # GNU date embeds "N days ago" in the emitted command; BSD/macOS uses -v-Nd.
+            days=$(grep -Eo '[0-9]+ days ago' "$profile_file" 2>/dev/null | head -1 | awk '{ print $1 }') || true
+            if [[ -z "$days" ]]; then
+                days=$(grep -Eo -- '-v-[0-9]+d' "$profile_file" 2>/dev/null | head -1 | sed -e 's/-v-//' -e 's/d//') || true
+            fi
+            if [[ -n "$days" ]]; then
+                record pip $STATUS_OK "shell wrapper with ${days}-day cooldown in $profile_file"
+            else
+                record pip $STATUS_OK "shell wrapper with cooldown in $profile_file"
+            fi
         fi
         return
     fi
 
-    # Check env var
+    # Check current env var (not in profile yet, or set externally)
     if [[ -n "${PIP_UPLOADED_PRIOR_TO:-}" ]]; then
-        check_date_staleness pip "PIP_UPLOADED_PRIOR_TO='$PIP_UPLOADED_PRIOR_TO'" "$PIP_UPLOADED_PRIOR_TO"
+        if [[ "$PIP_UPLOADED_PRIOR_TO" =~ ^P[0-9]+D$ ]]; then
+            local days="${PIP_UPLOADED_PRIOR_TO:1:-1}"
+            record pip $STATUS_OK "PIP_UPLOADED_PRIOR_TO='$PIP_UPLOADED_PRIOR_TO' (${days}-day cooldown)"
+        elif [[ "$PIP_UPLOADED_PRIOR_TO" =~ ^P[0-9YMWDTHS]+$ ]]; then
+            record pip $STATUS_OK "PIP_UPLOADED_PRIOR_TO='$PIP_UPLOADED_PRIOR_TO' (duration)"
+        else
+            check_date_staleness pip "PIP_UPLOADED_PRIOR_TO='$PIP_UPLOADED_PRIOR_TO'" "$PIP_UPLOADED_PRIOR_TO"
+        fi
         return
     fi
 
-    # Check pip.conf
+    # Check pip.conf files for uploaded-prior-to
     local pip_conf=""
     for candidate in \
         "${HOME}/.config/pip/pip.conf" \
@@ -500,18 +596,28 @@ check_pip() {
     done
 
     if [[ -n "$pip_conf" ]]; then
-        local configured_date
-        configured_date=$(extract_kv uploaded-prior-to "$pip_conf" || echo "")
-        check_date_staleness pip "uploaded-prior-to=$configured_date in $pip_conf" "$configured_date"
+        local configured_val
+        configured_val=$(extract_kv uploaded-prior-to "$pip_conf" || echo "")
+        if [[ "$configured_val" =~ ^P[0-9YMWDTHS]+$ ]]; then
+            record pip $STATUS_OK "uploaded-prior-to='$configured_val' (duration) in $pip_conf"
+        else
+            check_date_staleness pip "uploaded-prior-to=$configured_val in $pip_conf" "$configured_val"
+        fi
         return
     fi
 
     # Check for unmarked PIP_UPLOADED_PRIOR_TO in profile files
-    local profile_file
     if profile_file=$(find_in_profiles "PIP_UPLOADED_PRIOR_TO="); then
         local val
         val=$(extract_kv PIP_UPLOADED_PRIOR_TO "$profile_file" || echo "")
-        check_date_staleness pip "PIP_UPLOADED_PRIOR_TO='$val' in $profile_file (not yet sourced)" "$val"
+        if [[ "$val" =~ ^P[0-9]+D$ ]]; then
+            local days="${val:1:-1}"
+            record pip $STATUS_OK "PIP_UPLOADED_PRIOR_TO='$val' (${days}-day cooldown) in $profile_file (not yet sourced)"
+        elif [[ "$val" =~ ^P[0-9YMWDTHS]+$ ]]; then
+            record pip $STATUS_OK "PIP_UPLOADED_PRIOR_TO='$val' (duration) in $profile_file (not yet sourced)"
+        else
+            check_date_staleness pip "PIP_UPLOADED_PRIOR_TO='$val' in $profile_file (not yet sourced)" "$val"
+        fi
         return
     fi
 
@@ -634,8 +740,13 @@ check_deno() {
 }
 
 check_cargo() {
+    if ! cargo install --list 2>/dev/null | grep -q '^cargo-cooldown '; then
+        record cargo $STATUS_WARN "cargo-cooldown crate is not installed"
+        return
+    fi
+
     if [[ -n "${COOLDOWN_MINUTES:-}" ]]; then
-        record cargo $STATUS_OK "COOLDOWN_MINUTES=$COOLDOWN_MINUTES ($(minutes_to_days "$COOLDOWN_MINUTES")d, requires cargo-cooldown)"
+        record cargo $STATUS_OK "COOLDOWN_MINUTES=$COOLDOWN_MINUTES ($(minutes_to_days "$COOLDOWN_MINUTES")d)"
         return
     fi
 
@@ -737,7 +848,8 @@ tools: pip, uv, npm, pnpm, yarn, bun, deno, cargo
 duration examples: 3d, "3 days", 7d, 1d
 
 where configs are written (all user-wide; project-level configs are not modified):
-  pip    shell wrapper      /etc/profile.d/cooldowns.sh (or ~/.zshrc / ~/.bashrc)
+  pip    env var (26.1+) or shell wrapper (older)
+                            /etc/profile.d/cooldowns.sh (or ~/.zshrc / ~/.bashrc)
   uv     env var export     /etc/profile.d/cooldowns.sh (or ~/.zshrc / ~/.bashrc)
   npm    .npmrc key         ~/.npmrc
   pnpm   .npmrc key         ~/.npmrc
@@ -745,6 +857,7 @@ where configs are written (all user-wide; project-level configs are not modified
   bun    bunfig.toml key    ~/.bunfig.toml
   deno   shell aliases      /etc/profile.d/cooldowns.sh (or ~/.zshrc / ~/.bashrc)
   cargo  env var export     /etc/profile.d/cooldowns.sh (or ~/.zshrc / ~/.bashrc)
+                            (requires cargo-cooldown crate; use 'cargo cooldown <cmd>')
 
   Fallback chooses ~/.zshrc or ~/.bashrc based on $SHELL.
 

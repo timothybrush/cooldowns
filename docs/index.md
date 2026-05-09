@@ -79,17 +79,39 @@ configuration setting.
 
 ### pip
 
-pip 26.0 added `--uploaded-prior-to`, but unfortunately it only takes absolute timestamps, not relative durations like
-"3 days ago". [pip issue #13674](https://github.com/pypa/pip/issues/13674) tracks the implementation of relative
-durations.
+pip 26.1 (released April 2026) supports ISO 8601 duration format for the `--uploaded-prior-to` option. For example,
+the following installation command will ignore any versions of package `foo` that are newer than three days:
 
-To work around this limitation, you can for example compute the cutoff date on the fly every time you run
-pip by adding this function to your `~/.bashrc` (or a shell RC file of your choice):
+```bash
+pip install --uploaded-prior-to P3D foo
+```
+
+As an environment variable (applies to all `pip install`, `pip download`, and `pip wheel` commands):
+
+```bash
+export PIP_UPLOADED_PRIOR_TO="P3D"
+```
+
+Or in `~/.config/pip/pip.conf`:
+
+```ini
+[install]
+uploaded-prior-to = P3D
+```
+
+See [pip documentation](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-uploaded-prior-to) for more information
+about this configuration option.
+
+#### pip < 26.1
+
+Older pip versions (26.0) only accept absolute timestamps for `--uploaded-prior-to`. Since absolute timestamps go
+stale, you need to compute them dynamically. One option is a shell wrapper in your `~/.bashrc` (or a shell RC file of
+your choice):
 
 ```bash
 pip() {
     local pip_major
-    pip_major=$(command pip --version 2>/dev/null | grep -oP '\d+(?=\.\d+)' | head -1)
+    pip_major=$(command pip --version 2>/dev/null | awk '{ split($2, a, "."); print a[1]; exit }')
 
     case "$1" in
         install|download|wheel)
@@ -155,15 +177,6 @@ Hourly cronjob:
 ```
 0 * * * * /usr/local/bin/pip-dependency-cooldown ~/.config/pip/pip.conf 3 2>&1 | logger -t pip-dependency-cooldown
 ```
-
-For containers or ephemeral environments, you can also use the following environment variable:
-
-```bash
-export PIP_UPLOADED_PRIOR_TO="2026-03-27"
-```
-
-See [pip documentation](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-uploaded-prior-to) for more information
-about this configuration option.
 
 ### conda
 
@@ -274,11 +287,14 @@ Cargo doesn't have native cooldown support yet. Cargo 1.94 added `pubtime` field
 and an RFC ([#3923](https://github.com/rust-lang/rfcs/pull/3923)) for native cooldowns is in progress.
 
 Until that is implemented, the third-party [`cargo-cooldown`](https://crates.io/crates/cargo-cooldown) crate can be used
-instead:
+instead. Note that `cargo-cooldown` is a cargo subcommand, not a transparent wrapper. You must use
+`cargo cooldown <command>` instead of `cargo <command>` for cooldowns to take effect. Setting `COOLDOWN_MINUTES` alone
+does nothing; it is only read by the `cargo-cooldown` subcommand.
 
 ```bash
 cargo install cargo-cooldown
-COOLDOWN_MINUTES=4320 cargo cooldown build  # 3 days
+export COOLDOWN_MINUTES=4320  # 3 days, in minutes
+cargo cooldown build
 ```
 
 ## Other ecosystems
@@ -347,13 +363,17 @@ themselves.
 
 ### Relative durations
 
-uv, npm, pnpm, Bun, Deno, and Yarn all accept relative durations, so you can just set environment variables or add
-config files into the image at build time. These don't go stale because the duration is always relative to "now".
+uv, pip (26.1+), npm, pnpm, Bun, Deno, and Yarn all accept relative durations, so you can just set environment
+variables or add config files into the image at build time. These don't go stale because the duration is always
+relative to "now".
 
 In a `Containerfile`:
 
 ```dockerfile
 FROM quay.io/fedora/fedora
+
+# pip cooldown (26.1+)
+ENV PIP_UPLOADED_PRIOR_TO="P3D"
 
 # uv cooldown
 ENV UV_EXCLUDE_NEWER="3 days"
@@ -362,11 +382,12 @@ ENV UV_EXCLUDE_NEWER="3 days"
 COPY .npmrc /path/to/your/app/dir
 ```
 
-Every `uv sync`/`uv pip install` or `npm install` inside the container respects the cooldown with no extra work.
+Every `pip install`, `uv sync`/`uv pip install`, or `npm install` inside the container respects the cooldown with no
+extra work.
 
-### pip
+### pip < 26.1
 
-Since pip only takes absolute dates, compute the cutoff at build time in the same `RUN` step that installs your
+For older pip versions, compute the absolute cutoff date at build time in the same `RUN` step that installs your
 dependencies:
 
 ```dockerfile
@@ -377,11 +398,10 @@ RUN PIP_UPLOADED_PRIOR_TO=$(date -u -d '3 days ago' '+%Y-%m-%dT%H:%M:%SZ') \
     pip install -r requirements.txt
 ```
 
-The date is evaluated when the image is built, which is exactly when `pip install` runs.
-
-If you maintain development containers where developers might run `pip install` interactively, you'll also want the
-cooldown to apply at runtime. You can replicate the same shell function wrapper from the earlier section into
-`/etc/profile.d/` so it's sourced for all interactive shells:
+The date is evaluated when the image is built, which is exactly when `pip install` runs. If you maintain development
+containers where developers might run `pip install` interactively, you'll also want the cooldown to apply at runtime.
+You can replicate the same shell function wrapper from the earlier section into `/etc/profile.d/` so it's sourced
+for all interactive shells:
 
 ```dockerfile
 COPY pip-cooldown.sh /etc/profile.d/pip-cooldown.sh
@@ -406,14 +426,14 @@ location depends on the tool:
 
 | Tool  | Method            | Location                                          |
 |-------|-------------------|---------------------------------------------------|
-| pip   | Shell wrapper     | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)    |
+| pip   | Env var export (26.1+) or shell wrapper (older) | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`) |
 | uv    | Env var export    | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)    |
 | npm   | `.npmrc` key      | `~/.npmrc`                                        |
 | pnpm  | `.npmrc` key      | `~/.npmrc`                                        |
 | yarn  | Env var export    | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)    |
 | bun   | `bunfig.toml` key | `~/.bunfig.toml`                                  |
 | deno  | Shell aliases     | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)    |
-| cargo | Env var export    | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)    |
+| cargo | Env var export (requires `cargo-cooldown` crate) | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`) |
 
 Tools that use profile scripts write to `/etc/profile.d/cooldowns.sh` if the directory exists and is writable,
 otherwise they fall back to `~/.bashrc`.
@@ -429,7 +449,7 @@ The `check` command scans all installed package managers and reports their coold
 ```
 Checking dependency cooldown configurations...
 
-  ok      pip      shell wrapper with 3-day cooldown in /etc/profile.d/cooldowns.sh
+  ok      pip      PIP_UPLOADED_PRIOR_TO='P3D' (3-day cooldown) in /etc/profile.d/cooldowns.sh
   ok      uv       UV_EXCLUDE_NEWER="3 days" in /etc/profile.d/cooldowns.sh
   ok      npm      min-release-age=3d in /home/user/.npmrc
   MISS    cargo    no cooldown configured
@@ -461,14 +481,14 @@ RUN cooldowns.sh check
 
 | Package Manager | Cooldown support    | Configuration                                              |
 |-----------------|---------------------|------------------------------------------------------------|
-| pip             | Absolute dates only | `--uploaded-prior-to` / shell wrapper / cron               |
+| pip             | Relative durations (26.1+) | `PIP_UPLOADED_PRIOR_TO="P3D"` / `--uploaded-prior-to P3D`  |
 | uv              | Relative durations  | `exclude-newer = "3 days"` in `uv.toml` / `pyproject.toml` |
 | npm             | Relative durations  | `min-release-age=3` in `.npmrc`                            |
 | pnpm            | Relative durations  | `minimumReleaseAge: 4320` in `pnpm-workspace.yaml`         |
 | Yarn            | Relative durations  | `npmMinimalAgeGate: "3d"` in `.yarnrc.yml`                 |
 | Bun             | Relative durations  | `minimumReleaseAge = 259200` in `bunfig.toml`              |
 | Deno            | Relative durations  | `minimumDependencyAge: "P3D"` in `deno.json`               |
-| Cargo           | Third-party only    | `cargo-cooldown` crate                                     |
+| Cargo           | Third-party only    | `cargo cooldown <cmd>` via `cargo-cooldown` crate          |
 | Go              | Not available       | Dependabot/Renovate only                                   |
 | Maven/Gradle    | Not available       | Dependabot/Renovate only                                   |
 | NuGet           | Not available       | Dependabot/Renovate only                                   |
@@ -485,3 +505,8 @@ updates) to make sure critical fixes still reach you quickly.
 That said, most real-world package compromises follow the same pattern: an attacker publishes a malicious version, and
 it gets caught and pulled within hours or days. A three-day cooldown would have blocked the majority of recent incidents
 with zero ongoing effort after initial setup. Pick a number, configure it, and stay safe out there!
+
+## Changelog
+
+- **2026-05-07**: Added pip 26.1+ duration format support (e.g. `P3D`). The `cooldowns.sh` script now auto-detects
+  pip version and uses duration format for 26.1+ or falls back to shell wrappers for older versions.
