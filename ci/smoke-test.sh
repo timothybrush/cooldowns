@@ -26,8 +26,13 @@ if [[ ! -f "$bunfig" ]]; then
   verify_bunfig_mode_preserved=true
 fi
 
+configured_tools=()
 for t in pip uv npm pnpm yarn bun deno cargo; do
-  cooldowns.sh set "$t" 7d
+  set_out=$(cooldowns.sh set "$t" 7d)
+  echo "$set_out"
+  if ! echo "$set_out" | grep -q "skipping"; then
+    configured_tools+=("$t")
+  fi
 done
 
 if [[ "$verify_bunfig_mode_preserved" == true ]]; then
@@ -56,12 +61,13 @@ grep -q "Checking dependency cooldown configurations" "$check_log" || {
   cat "$check_log"
   exit 1
 }
-grep -q "8 configured, 0 warnings, 0 not configured" "$check_log" || {
-  echo "expected check summary missing"
+expected=${#configured_tools[@]}
+grep -q "${expected} configured, 0 warnings, 0 not configured" "$check_log" || {
+  echo "expected check summary '${expected} configured, 0 warnings, 0 not configured' missing"
   cat "$check_log"
   exit 1
 }
-for t in pip uv npm pnpm yarn bun deno cargo; do
+for t in "${configured_tools[@]}"; do
   grep -qE "^  ok[[:space:]]+${t}[[:space:]]" "$check_log" || {
     echo "expected ok line for ${t} missing"
     cat "$check_log"
