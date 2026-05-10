@@ -545,7 +545,7 @@ check_pip() {
             val=$(extract_kv PIP_UPLOADED_PRIOR_TO "$profile_file" || echo "")
             [[ -z "${PIP_UPLOADED_PRIOR_TO:-}" ]] && sourced=" (not yet sourced)"
             if [[ "$val" =~ ^P[0-9]+D$ ]]; then
-                local days="${val:1:-1}"
+                local days="${val#P}"; days="${days%D}"
                 record pip $STATUS_OK "PIP_UPLOADED_PRIOR_TO='$val' (${days}-day cooldown) in $profile_file$sourced"
             elif [[ "$val" =~ ^P[0-9YMWDTHS]+$ ]]; then
                 record pip $STATUS_OK "PIP_UPLOADED_PRIOR_TO='$val' (duration) in $profile_file$sourced"
@@ -572,7 +572,7 @@ check_pip() {
     # Check current env var (not in profile yet, or set externally)
     if [[ -n "${PIP_UPLOADED_PRIOR_TO:-}" ]]; then
         if [[ "$PIP_UPLOADED_PRIOR_TO" =~ ^P[0-9]+D$ ]]; then
-            local days="${PIP_UPLOADED_PRIOR_TO:1:-1}"
+            local days="${PIP_UPLOADED_PRIOR_TO#P}"; days="${days%D}"
             record pip $STATUS_OK "PIP_UPLOADED_PRIOR_TO='$PIP_UPLOADED_PRIOR_TO' (${days}-day cooldown)"
         elif [[ "$PIP_UPLOADED_PRIOR_TO" =~ ^P[0-9YMWDTHS]+$ ]]; then
             record pip $STATUS_OK "PIP_UPLOADED_PRIOR_TO='$PIP_UPLOADED_PRIOR_TO' (duration)"
@@ -611,7 +611,7 @@ check_pip() {
         local val
         val=$(extract_kv PIP_UPLOADED_PRIOR_TO "$profile_file" || echo "")
         if [[ "$val" =~ ^P[0-9]+D$ ]]; then
-            local days="${val:1:-1}"
+            local days="${val#P}"; days="${days%D}"
             record pip $STATUS_OK "PIP_UPLOADED_PRIOR_TO='$val' (${days}-day cooldown) in $profile_file (not yet sourced)"
         elif [[ "$val" =~ ^P[0-9YMWDTHS]+$ ]]; then
             record pip $STATUS_OK "PIP_UPLOADED_PRIOR_TO='$val' (duration) in $profile_file (not yet sourced)"
