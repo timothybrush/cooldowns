@@ -68,15 +68,20 @@ esac
 # ---------------------------------------------------------------------------
 
 # Get pip version (e.g., "26.1.0" -> "26.1.0")
-# Returns empty string if pip is not installed
+# Returns empty string if neither pip nor pip3 is on PATH (e.g. Homebrew only ships pip3)
 get_pip_version() {
-    if ! command -v pip &>/dev/null; then
+    local pip_cmd=""
+    if command -v pip &>/dev/null; then
+        pip_cmd=pip
+    elif command -v pip3 &>/dev/null; then
+        pip_cmd=pip3
+    else
         echo ""
         return 1
     fi
 
     local version
-    version=$(command pip --version 2>/dev/null | awk '{print $2; exit}')
+    version=$(command "$pip_cmd" --version 2>/dev/null | awk '{print $2; exit}')
     echo "$version"
 }
 
