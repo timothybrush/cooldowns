@@ -325,7 +325,7 @@ updates.cooldown = {
 dependencyOverrides = [
   {
     dependency = { groupId = "com.my-company" },
-    cooldown = { minimumAge = "0 days" }
+    cooldown = { minimumAge = "1 day" }
   },
   {
     dependency = { groupId = "com.example", artifactId = "foo" },
@@ -334,7 +334,10 @@ dependencyOverrides = [
 ]
 ```
 
-The first matching entry wins, so list more specific patterns before broader ones. See the
+The first matching entry wins, so list more specific patterns before broader ones. Note that even for
+internal/company-controlled libraries it's worth keeping a small cooldown (e.g. one day) rather than zero:
+those libraries can still pull in third-party transitive dependencies that were updated by hand and may
+themselves be compromised. See the
 [Scala Steward repo-specific configuration docs](https://github.com/scala-steward-org/scala-steward/blob/main/docs/repo-specific-configuration.md)
 for more information.
 
