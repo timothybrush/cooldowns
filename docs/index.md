@@ -4,7 +4,6 @@ hide:
 search:
   exclude: true
 ---
-
 # Dependency Cooldowns
 
 In March 2026 alone, three widely-used packages were compromised after attackers gained access to tokens used to publish
@@ -351,8 +350,10 @@ been accepted. [NuGet](https://github.com/NuGet/Home/issues/14657),
 locking your dependencies to exact versions, and configuring cooldowns in Dependabot or Renovate for automated updates
 (see below).
 
-Maven/Gradle (Java), RubyGems/Bundler (Ruby), and Swift Package Manager don't have native cooldowns either, and no
-open requests exist requesting this feature as of today.
+Maven/Gradle (Java) don't have native cooldowns either, but the third-party [Scala Steward](#scala-jvm-ecosystem) bot
+described above can apply cooldowns to Maven/Gradle projects (though it's not heavily used outside of Scala).
+RubyGems/Bundler (Ruby) and Swift Package Manager don't have native cooldowns either, and no open requests exist
+requesting this feature as of today.
 
 One exception worth noting: the community-run [gem.coop package index](https://gem.coop), an alternative to RubyGems,
 enforces a 48-hour delay on newly published gems at the registry level.
