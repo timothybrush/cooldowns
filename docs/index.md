@@ -305,7 +305,7 @@ PRs for JVM projects. Despite its name, it works with multiple build tools (sbt,
 others). It added a cooldown feature in version 0.38.0, with more detailed configuration in 0.38.1.
 Cooldowns are configured per-repository in a `.scala-steward.conf` file at the root of the project:
 
-```hocon
+```properties
 updates.cooldown = {
   minimumAge = "3 days"
 }
@@ -316,7 +316,7 @@ younger than `minimumAge`.
 
 You can also override the cooldown for specific dependencies via `dependencyOverrides`:
 
-```hocon
+```properties
 updates.cooldown = {
   minimumAge = "3 days"
 }
