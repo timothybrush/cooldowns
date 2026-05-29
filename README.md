@@ -290,6 +290,50 @@ export COOLDOWN_MINUTES=4320  # 3 days, in minutes
 cargo cooldown build
 ```
 
+## Scala / JVM Ecosystem
+
+### Scala Steward
+
+[Scala Steward](https://github.com/scala-steward-org/scala-steward) is a bot that opens dependency update
+PRs for JVM projects. Despite its name, it works with multiple build tools (sbt, Mill, Maven, Gradle, and
+others). It added a cooldown feature in version 0.38.0, with more detailed configuration in 0.38.1.
+Cooldowns are configured per-repository in a `.scala-steward.conf` file at the root of the project:
+
+```hocon
+updates.cooldown = {
+  minimumAge = "3 days"
+}
+```
+
+Scala Steward calculates a version's age from when it first observed the version, and ignores updates
+younger than `minimumAge`.
+
+You can also override the cooldown for specific dependencies via `dependencyOverrides`:
+
+```hocon
+updates.cooldown = {
+  minimumAge = "3 days"
+}
+
+dependencyOverrides = [
+  {
+    dependency = { groupId = "com.my-company" },
+    cooldown = { minimumAge = "1 day" }
+  },
+  {
+    dependency = { groupId = "com.example", artifactId = "foo" },
+    cooldown = { minimumAge = "14 days" }
+  }
+]
+```
+
+The first matching entry wins, so list more specific patterns before broader ones. Note that even for
+internal/company-controlled libraries it's worth keeping a small cooldown (e.g. one day) rather than zero:
+those libraries can still pull in third-party transitive dependencies that were updated by hand and may
+themselves be compromised. See the
+[Scala Steward repo-specific configuration docs](https://github.com/scala-steward-org/scala-steward/blob/main/docs/repo-specific-configuration.md)
+for more information.
+
 ## Other ecosystems
 
 These language ecosystems currently offer no native cooldown support. There's
@@ -300,8 +344,10 @@ been accepted. [NuGet](https://github.com/NuGet/Home/issues/14657),
 locking your dependencies to exact versions, and configuring cooldowns in Dependabot or Renovate for automated updates
 (see below).
 
-Maven/Gradle (Java), RubyGems/Bundler (Ruby), and Swift Package Manager don't have native cooldowns either, and no
-open requests exist requesting this feature as of today.
+Maven/Gradle (Java) don't have native cooldowns either, but the third-party [Scala Steward](#scala-jvm-ecosystem) bot
+described above can apply cooldowns to Maven/Gradle projects (though it's not heavily used outside of Scala).
+RubyGems/Bundler (Ruby) and Swift Package Manager don't have native cooldowns either, and no open requests exist
+requesting this feature as of today.
 
 One exception worth noting: the community-run [gem.coop package index](https://gem.coop), an alternative to RubyGems,
 enforces a 48-hour delay on newly published gems at the registry level.
@@ -482,6 +528,7 @@ RUN cooldowns.sh check
 | Bun             | Relative durations  | `minimumReleaseAge = 259200` in `bunfig.toml`              |
 | Deno            | Relative durations  | `minimumDependencyAge: "P3D"` in `deno.json`               |
 | Cargo           | Third-party only    | `cargo cooldown <cmd>` via `cargo-cooldown` crate          |
+| Scala Steward   | Relative durations (0.38.0+) | `updates.cooldown.minimumAge = "3 days"` in `.scala-steward.conf` |
 | Go              | Not available       | Dependabot/Renovate only                                   |
 | Maven/Gradle    | Not available       | Dependabot/Renovate only                                   |
 | NuGet           | Not available       | Dependabot/Renovate only                                   |
