@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # CI/local: configure all tools, source a profile, assert on `cooldowns.sh check`.
 # Usage:
-#   bash ci/smoke-test.sh <profile-to-source>
-#   bash -s <profile-to-source> < ci/smoke-test.sh   # stdin (Docker-friendly)
+#   bash tests/smoke-test.sh <profile-to-source>
+#   bash -s <profile-to-source> < tests/smoke-test.sh   # stdin (container-friendly)
 # Expects cooldowns.sh on PATH.
 set -euo pipefail
 
-profile="${1:?usage: ci/smoke-test.sh <profile-to-source>}"
+profile="${1:?usage: tests/smoke-test.sh <profile-to-source>}"
 
 # `set bun` rewrites ~/.bunfig.toml via mktemp+mv when [install] exists; mode must match
 # the previous file (copy_mode_from). Seed that case only when bunfig is absent.
@@ -39,10 +39,10 @@ if command -v pnpm &>/dev/null; then
 fi
 
 configured_tools=()
-for t in pip uv npm pnpm yarn bun deno cargo; do
+for t in pip uv poetry npm pnpm yarn bun deno cargo; do
   set_out=$(cooldowns.sh set "$t" 7d)
   echo "$set_out"
-  if ! echo "$set_out" | grep -q "not installed, skipping"; then
+  if ! echo "$set_out" | grep -q "skipping" || echo "$set_out" | grep -q "already"; then
     configured_tools+=("$t")
   fi
 done
@@ -59,6 +59,18 @@ if command -v pnpm &>/dev/null; then
         exit 1
     fi
     echo "smoke: pnpm minimum-release-age=$pnpm_val in pnpm global config, absent from ~/.npmrc"
+fi
+
+# poetry: verify solver.min-release-age landed in poetry's own config.
+if command -v poetry &>/dev/null; then
+    poetry_val=$(poetry config solver.min-release-age 2>/dev/null || true)
+    if [[ -n "$poetry_val" ]]; then
+        [[ "$poetry_val" == "7" ]] || {
+            echo "smoke: poetry solver.min-release-age: expected 7 (7 days), got '${poetry_val}'" >&2
+            exit 1
+        }
+        echo "smoke: poetry solver.min-release-age=$poetry_val in poetry config"
+    fi
 fi
 
 if [[ "$verify_bunfig_mode_preserved" == true ]]; then
