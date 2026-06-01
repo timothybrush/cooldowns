@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
 Hourly cronjob:
 
-```
+```crontab
 0 * * * * /usr/local/bin/pip-dependency-cooldown ~/.config/pip/pip.conf 3 2>&1 | logger -t pip-dependency-cooldown
 ```
 
@@ -175,20 +175,20 @@ Hourly cronjob:
 
 poetry added the [`solver.min-release-age`](https://python-poetry.org/docs/configuration/#solvermin-release-age) setting in 2.4.0. To set it globally, execute:
 
-```
+```bash
 # Set a global minimum release age of 3 days
 poetry config solver.min-release-age 3
 ```
 
 As an environment variable:
 
-```
+```bash
 export POETRY_SOLVER_MIN_RELEASE_AGE=3
 ```
 
 You can also set the following in your project's `pyproject.toml` or in `~/.config/pypoetry/config.toml`:
 
-```
+```toml
 [solver]
 min-release-age = 3
 ```
@@ -233,14 +233,14 @@ See [npm documentation](https://docs.npmjs.com/cli/v11/using-npm/config#min-rele
 pnpm 10.16.0 added `minimumReleaseAge` to support cooldowns; you can add the following to your `~/.config/pnpm/rc` file
 (or the equivalent project-specific configuration file):
 
-```text
+```yaml
 minimumReleaseAge: 4320 # 3 days
 ```
 
 The value represents the number of minutes a release must be available before it is installed. You can also exclude
 specific packages from this policy with:
 
-```text
+```yaml
 minimumReleaseAge: 4320 # 3 days
 minimumReleaseAgeExclude:
 - webpack
@@ -515,7 +515,7 @@ cooldowns.sh check
 
 The `check` command scans all installed package managers and reports their cooldown status:
 
-```
+```text
 Checking dependency cooldown configurations...
 
   ok      pip      PIP_UPLOADED_PRIOR_TO='P3D' (3-day cooldown) in /etc/profile.d/cooldowns.sh
