@@ -9,6 +9,7 @@ script (`cooldowns.sh`) that automates checking and configuring cooldowns.
 
 - `docs/index.md` and `README.md` must be kept in sync — they have the same
   content except for frontmatter in `docs/index.md`. Verify with:
+
   ```sh
   diff <(sed '1,/^---$/d' docs/index.md) README.md
   ```
@@ -26,7 +27,14 @@ script (`cooldowns.sh`) that automates checking and configuring cooldowns.
 
 - Run `shellcheck cooldowns.sh` after each change to the script.
 
+- Lint markdown after each change to the documentation files:
+
+  ```sh
+  uv run --with mdlint mdlint check
+  ```
+
 - Build and validate docs after each change to docs/index.md:
+
   ```sh
   uv run --with zensical zensical build
   ```

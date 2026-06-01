@@ -4,6 +4,7 @@ hide:
 search:
   exclude: true
 ---
+
 # Dependency Cooldowns
 
 In March 2026 alone, three widely-used packages were compromised after attackers gained access to tokens used to publish
@@ -27,11 +28,12 @@ makes sure you're not the one who installs it before they do.
 ## Does it actually work?
 
 [An analysis of ten prominent supply chain attacks](https://blog.yossarian.net/2025/11/21/We-should-all-be-using-dependency-cooldowns)
-found that eight had exploitation windows under one week. All but one lasted under two weeks. Attackers move fast
-after compromising a project, but they also get caught fast. A three-day cooldown would have blocked most of these. In
-the [August 2025 Nx npm attack](https://socket.dev/blog/nx-packages-compromised), malicious code exfiltrated credentials within a 4–5 hour window before the package
-was pulled. The LiteLLM compromise mentioned above also had a window of only a few hours (first detected at 10:39 UTC,
-quarantined on PyPI at 13:38 UTC).
+found that eight had exploitation windows under one week.
+All but one lasted under two weeks. Attackers move fast after compromising a project, but they also get caught fast.
+A three-day cooldown would have blocked most of these.
+In the [August 2025 Nx npm attack](https://socket.dev/blog/nx-packages-compromised), malicious code exfiltrated credentials
+within a 4–5 hour window before the package was pulled. The LiteLLM compromise mentioned above also had a window of only
+a few hours (first detected at 10:39 UTC, quarantined on PyPI at 13:38 UTC).
 
 That's roughly an 80-90% reduction in exposure for a simple config change (if the package manager of your choice
 supports the cooldown feature, see below). All native implementations enforce cooldowns on transitive dependencies too,
@@ -179,7 +181,9 @@ Hourly cronjob:
 
 ### poetry
 
-poetry added the [`solver.min-release-age`](https://python-poetry.org/docs/configuration/#solvermin-release-age) setting in 2.4.0. To set it globally, execute:
+poetry added the
+[`solver.min-release-age`](https://python-poetry.org/docs/configuration/#solvermin-release-age) setting in 2.4.0.
+To set it globally, execute:
 
 ```bash
 # Set a global minimum release age of 3 days
@@ -199,7 +203,8 @@ You can also set the following in your project's `pyproject.toml` or in `~/.conf
 min-release-age = 3
 ```
 
-If the package registry does not expose upload times for a release, `poetry` fails open and will allow a release to be installed. See [Private PyPI registries](#private-pypi-registries).
+If the package registry does not expose upload times for a release, `poetry` fails open and will allow a release to be installed.
+See [Private PyPI registries](#private-pypi-registries).
 
 ### conda
 
@@ -208,10 +213,12 @@ issue [#15759](https://github.com/conda/conda/issues/15759) proposed its impleme
 
 ### Private PyPI registries
 
-If the registry does not expose upload times for a release, `uv` and `pip` will fail closed and reject to install a package whose version would have been excluded, while `poetry` fails open and will allow that version to be installed.
+If the registry does not expose upload times for a release, `uv` and `pip` will fail closed and reject to install a package
+whose version would have been excluded, while `poetry` fails open and will allow that version to be installed.
 
-Upload times are only supported by the JSON-version of the PyPI Simple API, so tools that only support the HTML format do not support upload times.
-For example, in JFrog Artifactory settings you have to enable the PyPI Simple JSON API, which is only available as of their February 2026 (SaaS) or April 2026 (self-hosted) releases.
+Upload times are only supported by the JSON-version of the PyPI Simple API, so tools that only support the HTML format
+do not support upload times. For example, in JFrog Artifactory settings you have to enable the PyPI Simple JSON API,
+which is only available as of their February 2026 (SaaS) or April 2026 (self-hosted) releases.
 
 ## JavaScript Ecosystem
 
@@ -461,7 +468,7 @@ COPY .npmrc /path/to/your/app/dir
 Every `pip install`, `uv sync`/`uv pip install`, or `npm install` inside the container respects the cooldown with no
 extra work.
 
-### pip < 26.1
+### Absolute timestamps (pip < 26.1)
 
 For older pip versions, compute the absolute cutoff date at build time in the same `RUN` step that installs your
 dependencies:
@@ -500,16 +507,16 @@ cooldowns.sh set npm 7d
 Each `set` command writes a user-wide configuration for that tool. Project-level configs are not modified. The exact
 location depends on the tool:
 
-| Tool  | Method            | Location                                          |
-|-------|-------------------|---------------------------------------------------|
-| pip   | Env var export (26.1+) or shell wrapper (older) | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`) |
-| uv    | Env var export    | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)    |
-| npm   | `.npmrc` key      | `~/.npmrc`                                        |
-| pnpm  | `.npmrc` key      | `~/.npmrc`                                        |
-| yarn  | Env var export    | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)    |
-| bun   | `bunfig.toml` key | `~/.bunfig.toml`                                  |
-| deno  | Shell aliases     | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)    |
-| cargo | Env var export (requires `cargo-cooldown` crate) | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`) |
+| Tool  | Method                                           | Location                                        |
+|-------|--------------------------------------------------|-------------------------------------------------|
+| pip   | Env var export (26.1+) or shell wrapper (older)  | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)  |
+| uv    | Env var export                                   | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)  |
+| npm   | `.npmrc` key                                     | `~/.npmrc`                                      |
+| pnpm  | `.npmrc` key                                     | `~/.npmrc`                                      |
+| yarn  | Env var export                                   | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)  |
+| bun   | `bunfig.toml` key                                | `~/.bunfig.toml`                                |
+| deno  | Shell aliases                                    | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)  |
+| cargo | Env var export (requires `cargo-cooldown` crate) | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)  |
 
 Tools that use profile scripts write to `/etc/profile.d/cooldowns.sh` if the directory exists and is writable,
 otherwise they fall back to `~/.bashrc`.
@@ -555,23 +562,23 @@ RUN cooldowns.sh check
 
 ## Quick reference
 
-| Package Manager | Cooldown support    | Configuration                                              |
-|-----------------|---------------------|------------------------------------------------------------|
-| pip             | Relative durations (26.1+) | `PIP_UPLOADED_PRIOR_TO="P3D"` / `--uploaded-prior-to P3D`  |
-| uv              | Relative durations  | `exclude-newer = "3 days"` in `uv.toml` / `pyproject.toml` |
-| poetry          | Relative durations  | `solver.min-release-age=3` in `pyproject.toml`             |
-| npm             | Relative durations  | `min-release-age=3` in `.npmrc`                            |
-| pnpm            | Relative durations  | `minimumReleaseAge: 4320` in `pnpm-workspace.yaml`         |
-| Yarn            | Relative durations  | `npmMinimalAgeGate: "3d"` in `.yarnrc.yml`                 |
-| Bun             | Relative durations  | `minimumReleaseAge = 259200` in `bunfig.toml`              |
-| Deno            | Relative durations  | `minimumDependencyAge: "P3D"` in `deno.json`               |
-| Cargo           | Third-party only    | `cargo cooldown <cmd>` via `cargo-cooldown` crate          |
-| Scala Steward   | Relative durations (0.38.0+) | `updates.cooldown.minimumAge = "3 days"` in `.scala-steward.conf` |
-| Go              | Not available       | Dependabot/Renovate only                                   |
-| Maven/Gradle    | Not available       | Dependabot/Renovate only                                   |
-| NuGet           | Not available       | Dependabot/Renovate only                                   |
-| Composer        | Not available       | Dependabot/Renovate only                                   |
-| RubyGems        | Not available       | gem.coop proxy / Dependabot/Renovate                       |
+| Package Manager | Cooldown support               | Configuration                                                     |
+|-----------------|--------------------------------|-------------------------------------------------------------------|
+| pip             | Relative durations (26.1+)     | `PIP_UPLOADED_PRIOR_TO="P3D"` / `--uploaded-prior-to P3D`         |
+| uv              | Relative durations             | `exclude-newer = "3 days"` in `uv.toml` / `pyproject.toml`        |
+| poetry          | Relative durations             | `solver.min-release-age=3` in `pyproject.toml`                    |
+| npm             | Relative durations             | `min-release-age=3` in `.npmrc`                                   |
+| pnpm            | Relative durations             | `minimumReleaseAge: 4320` in `pnpm-workspace.yaml`                |
+| Yarn            | Relative durations             | `npmMinimalAgeGate: "3d"` in `.yarnrc.yml`                        |
+| Bun             | Relative durations             | `minimumReleaseAge = 259200` in `bunfig.toml`                     |
+| Deno            | Relative durations             | `minimumDependencyAge: "P3D"` in `deno.json`                      |
+| Cargo           | Third-party only               | `cargo cooldown <cmd>` via `cargo-cooldown` crate                 |
+| Scala Steward   | Relative durations (0.38.0+)   | `updates.cooldown.minimumAge = "3 days"` in `.scala-steward.conf` |
+| Go              | Not available                  | Dependabot/Renovate only                                          |
+| Maven/Gradle    | Not available                  | Dependabot/Renovate only                                          |
+| NuGet           | Not available                  | Dependabot/Renovate only                                          |
+| Composer        | Not available                  | Dependabot/Renovate only                                          |
+| RubyGems        | Not available                  | gem.coop proxy / Dependabot/Renovate                              |
 
 ## Conclusion
 

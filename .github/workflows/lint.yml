@@ -20,5 +20,8 @@ jobs:
 
       - uses: astral-sh/setup-uv@v6
 
+      - name: Markdown lint
+        run: uv run --with mdlint mdlint check docs/index.md README.md
+
       - name: Validate docs
         run: uv run --with zensical zensical build

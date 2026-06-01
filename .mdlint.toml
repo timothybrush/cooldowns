@@ -1,0 +1,5 @@
+ignore = ["MD051"]
+
+[rules.MD013]
+line_length = 120
+code_blocks = false

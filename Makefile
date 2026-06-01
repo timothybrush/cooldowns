@@ -5,6 +5,7 @@ docs:
 
 lint:
 	shellcheck cooldowns.sh
+	uv run --with mdlint mdlint check docs/index.md README.md
 	uv run --with zensical zensical build
 
 smoke-test:
