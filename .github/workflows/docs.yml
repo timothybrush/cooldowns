@@ -13,14 +13,13 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    env:
+      UV_EXCLUDE_NEWER: "3 days"
     steps:
       - uses: actions/configure-pages@v5
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.x
-      - run: pip install zensical
-      - run: zensical build --clean
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run --with zensical zensical build --clean
       - uses: actions/upload-pages-artifact@v4
         with:
           path: site

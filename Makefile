@@ -1,3 +1,5 @@
+export UV_EXCLUDE_NEWER ?= 3 days
+
 .PHONY: docs lint smoke-test
 
 docs:

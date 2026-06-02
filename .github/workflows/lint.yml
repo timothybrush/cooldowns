@@ -12,6 +12,8 @@ permissions:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    env:
+      UV_EXCLUDE_NEWER: "3 days"
     steps:
       - uses: actions/checkout@v5
 
