@@ -373,6 +373,16 @@ themselves be compromised. See the
 [Scala Steward repo-specific configuration docs](https://github.com/scala-steward-org/scala-steward/blob/main/docs/repo-specific-configuration.md)
 for more information.
 
+## IDE Extensions
+
+### VS Code
+
+VS Code does not have a native cooldown feature for extensions installed from the Visual Studio Marketplace.
+An open feature request ([#316867](https://github.com/microsoft/vscode/issues/316867)) proposes a
+`minimumReleaseAge` setting that would enforce a delay before new or updated extensions can be installed.
+Until it is implemented, review extension changelogs manually before updating,
+and pin extension versions where possible.
+
 ## Other ecosystems
 
 These language ecosystems currently offer no native cooldown support. There's
@@ -569,6 +579,7 @@ RUN cooldowns.sh check
 | Deno            | Relative durations             | `minimumDependencyAge: "P3D"` in `deno.json`                      |
 | Cargo           | Third-party only               | `cargo cooldown <cmd>` via `cargo-cooldown` crate                 |
 | Scala Steward   | Relative durations (0.38.0+)   | `updates.cooldown.minimumAge = "3 days"` in `.scala-steward.conf` |
+| VS Code         | Not available                  | Pin dependencies and review updates manually                      |
 | Go              | Not available                  | Dependabot/Renovate only                                          |
 | Maven/Gradle    | Not available                  | Dependabot/Renovate only                                          |
 | NuGet           | Not available                  | Dependabot/Renovate only                                          |
@@ -588,6 +599,7 @@ with zero ongoing effort after initial setup. Pick a number, configure it, and s
 
 ## Changelog
 
+- **2026-06-01**: Added VS Code documentation.
 - **2026-05-27**: Added Scala Steward cooldown documentation.
 - **2026-05-26**: Added pixi documentation.
 - **2026-05-21**: Added poetry configuration documentation and a note on private PyPI registries.
