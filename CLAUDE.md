@@ -7,12 +7,9 @@ script (`cooldowns.sh`) that automates checking and configuring cooldowns.
 
 ## Conventions
 
-- `docs/index.md` and `README.md` must be kept in sync — they have the same
-  content except for frontmatter in `docs/index.md`. Verify with:
-
-  ```sh
-  diff <(sed '1,/^---$/d' docs/index.md) README.md
-  ```
+- `README.md` is the single source of truth for documentation content.
+  `docs/index.md` includes it via `pymdownx.snippets` (`--8<-- "README.md"`)
+  and only adds frontmatter. Edit `README.md`, not `docs/index.md`.
 
 - `cooldowns.sh` must work on both Linux and macOS. Use portable constructs
   (e.g. `awk` instead of `grep -oP`, pure-bash version comparison instead
@@ -21,9 +18,9 @@ script (`cooldowns.sh`) that automates checking and configuring cooldowns.
 - There are two separate changelogs:
   - The changelog in `cooldowns.sh` records script functionality changes
     (new tool support, behavior changes). Keep entries to a single line.
-  - The changelog in `docs/index.md` (and `README.md`) records
-    documentation changes only (new tool docs, changes in configuration).
-    Do not duplicate script-level changes here.
+  - The changelog in `README.md` records documentation changes only
+    (new tool docs, changes in configuration). Do not duplicate
+    script-level changes here.
 
 - Run `shellcheck cooldowns.sh` after each change to the script.
 
@@ -33,7 +30,7 @@ script (`cooldowns.sh`) that automates checking and configuring cooldowns.
   uv run --with mdlint mdlint check
   ```
 
-- Build and validate docs after each change to docs/index.md:
+- Build and validate docs after each change to README.md:
 
   ```sh
   uv run --with zensical zensical build
