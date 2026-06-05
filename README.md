@@ -353,6 +353,52 @@ export COOLDOWN_MINUTES=4320  # 3 days, in minutes
 cargo cooldown build
 ```
 
+## Ruby Ecosystem
+
+### Bundler
+
+[Bundler](https://bundler.io/) introduced a native cooldown feature in version 4.0.13. The cooldown value is always a
+non-negative integer number of days (a string, float, negative number, or array is rejected). For example, to apply a
+three-day cooldown to a single command:
+
+```bash
+bundle install --cooldown 3
+```
+
+The `--cooldown` flag is supported by the `install`, `update`, `add`, and `outdated` commands.
+
+To set it for the current project, execute:
+
+```bash
+bundle config set cooldown 3
+```
+
+Or globally for all projects:
+
+```bash
+bundle config set --global cooldown 3
+```
+
+You can also declare a cooldown per-source directly in the `Gemfile`:
+
+```ruby
+source "https://rubygems.org", cooldown: 3
+```
+
+Or use the following environment variable:
+
+```bash
+export BUNDLE_COOLDOWN=3
+```
+
+When multiple settings apply, the override hierarchy is: command-line flag > configuration setting > per-source
+`Gemfile` declaration. Passing `0` disables the cooldown for that run.
+
+Bundler fails open: it only holds back versions it can prove are too new. Versions lacking a `created_at` timestamp
+(older servers, v1-format registries, some private gems) remain resolvable. See the
+[RubyGems blog announcement](https://blog.rubygems.org/2026/06/03/cooldown-let-new-gems-be-vetted.html) for more
+information.
+
 ## Scala / JVM Ecosystem
 
 ### Scala Steward
@@ -413,16 +459,15 @@ These language ecosystems currently offer no native cooldown support. There's
 an [open proposal](https://github.com/golang/go/issues/76485) for Go, but it hasn't
 been accepted. [NuGet](https://github.com/NuGet/Home/issues/14657),
 [Composer](https://github.com/composer/composer/issues/12633), and
-[Hex](https://github.com/hexpm/hex/issues/1113) also have open feature requests. Your best bet is
+[Hex](https://github.com/hexpm/hex/issues/1113) also have open feature requests. Swift Package Manager doesn't have
+native cooldowns either, and no open request exists requesting this feature as of today. Your best bet is
 locking your dependencies to exact versions, and configuring cooldowns in Dependabot or Renovate for automated updates
 (see below).
 
 Maven/Gradle (Java) don't have native cooldowns either, but the third-party [Scala Steward](#scala-jvm-ecosystem) bot
 described above can apply cooldowns to Maven/Gradle projects (though it's not heavily used outside of Scala).
-RubyGems/Bundler (Ruby) and Swift Package Manager don't have native cooldowns either, and no open requests exist
-requesting this feature as of today.
 
-One exception worth noting: the community-run [gem.coop package index](https://gem.coop), an alternative to RubyGems,
+One related note: the community-run [gem.coop package index](https://gem.coop), an alternative to RubyGems,
 enforces a 48-hour delay on newly published gems at the registry level.
 
 ## Dependency update bots
@@ -536,16 +581,18 @@ cooldowns.sh set npm 7d
 Each `set` command writes a user-wide configuration for that tool. Project-level configs are not modified. The exact
 location depends on the tool:
 
-| Tool  | Method                                           | Location                                        |
-|-------|--------------------------------------------------|-------------------------------------------------|
-| pip   | Env var export (26.1+) or shell wrapper (older)  | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)  |
-| uv    | Env var export                                   | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)  |
-| npm   | `.npmrc` key                                     | `~/.npmrc`                                      |
-| pnpm  | `.npmrc` key                                     | `~/.npmrc`                                      |
-| yarn  | Env var export                                   | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)  |
-| bun   | `bunfig.toml` key                                | `~/.bunfig.toml`                                |
-| deno  | Shell aliases                                    | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)  |
-| cargo | Env var export (requires `cargo-cooldown` crate) | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`)  |
+| Tool    | Method                                           | Location                                       |
+|---------|--------------------------------------------------|------------------------------------------------|
+| pip     | Env var export (26.1+) or shell wrapper (older)  | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`) |
+| uv      | Env var export                                   | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`) |
+| poetry  | `poetry config` setting                          | `~/.config/pypoetry/config.toml`               |
+| npm     | `.npmrc` key                                     | `~/.npmrc`                                     |
+| pnpm    | `.npmrc` key                                     | `~/.npmrc`                                     |
+| yarn    | Env var export                                   | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`) |
+| bun     | `bunfig.toml` key                                | `~/.bunfig.toml`                               |
+| deno    | Shell aliases                                    | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`) |
+| cargo   | Env var export (requires `cargo-cooldown` crate) | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`) |
+| bundler | Env var export (requires Bundler >= 4.0.13)      | `/etc/profile.d/cooldowns.sh` (or `~/.bashrc`) |
 
 Tools that use profile scripts write to `/etc/profile.d/cooldowns.sh` if the directory exists and is writable,
 otherwise they fall back to `~/.bashrc`.
@@ -603,13 +650,13 @@ RUN cooldowns.sh check
 | Bun             | Relative durations             | `minimumReleaseAge = 259200` in `bunfig.toml`                     |
 | Deno            | Relative durations             | `minimumDependencyAge: "P3D"` in `deno.json`                      |
 | Cargo           | Third-party only               | `cargo cooldown <cmd>` via `cargo-cooldown` crate                 |
+| Bundler         | Relative durations (4.0.13+)   | `bundle config set cooldown 3` / `--cooldown 3`                   |
 | Scala Steward   | Relative durations (0.38.0+)   | `updates.cooldown.minimumAge = "3 days"` in `.scala-steward.conf` |
 | VS Code         | Not available                  | Pin dependencies and review updates manually                      |
 | Go              | Not available                  | Dependabot/Renovate only                                          |
 | Maven/Gradle    | Not available                  | Dependabot/Renovate only                                          |
 | NuGet           | Not available                  | Dependabot/Renovate only                                          |
 | Composer        | Not available                  | Dependabot/Renovate only                                          |
-| RubyGems        | Not available                  | gem.coop proxy / Dependabot/Renovate                              |
 
 ## Conclusion
 
@@ -624,6 +671,7 @@ with zero ongoing effort after initial setup. Pick a number, configure it, and s
 
 ## Changelog
 
+- **2026-06-03**: Added Bundler (RubyGems) cooldown documentation.
 - **2026-06-01**: Added VS Code documentation.
 - **2026-05-27**: Added Scala Steward cooldown documentation.
 - **2026-05-26**: Added pixi documentation.
