@@ -261,8 +261,9 @@ See [npm documentation](https://docs.npmjs.com/cli/v11/using-npm/config#min-rele
 
 ### pnpm (JavaScript/Node.js)
 
-pnpm 10.16.0 added `minimumReleaseAge` to support cooldowns; you can add the following to your `~/.config/pnpm/rc` file
-(or the equivalent project-specific configuration file):
+pnpm 10.16.0 added `minimumReleaseAge` to support cooldowns. Since pnpm v11, a default cooldown of 1440 minutes (one
+day) is enabled out of the box. To increase it to three days, add the following to your `~/.config/pnpm/rc` file (or the
+equivalent project-specific configuration file):
 
 ```yaml
 minimumReleaseAge: 4320 # 3 days
@@ -340,7 +341,9 @@ information.
 ### Cargo
 
 Cargo doesn't have native cooldown support yet. Cargo 1.94 added `pubtime` fields to the crate index (the prerequisite),
-and an RFC ([#3923](https://github.com/rust-lang/rfcs/pull/3923)) for native cooldowns is in progress.
+and an RFC ([#3923](https://github.com/rust-lang/rfcs/blob/master/text/3923-cargo-min-publish-age.md)) for native
+cooldowns has been accepted, but the implementation is still in progress
+([#17009](https://github.com/rust-lang/cargo/issues/17009)).
 
 Until that is implemented, the third-party [`cargo-cooldown`](https://crates.io/crates/cargo-cooldown) crate can be used
 instead. Note that `cargo-cooldown` is a cargo subcommand, not a transparent wrapper. You must use
@@ -511,6 +514,14 @@ updates:
 
 Both Renovate and Dependabot exempt security updates from cooldowns, so critical CVE fixes still get PRs immediately.
 
+## Registry-level proxies
+
+Organizations that run a caching proxy such as JFrog Artifactory or Sonatype Nexus in front of public registries can
+enforce cooldowns at the registry level, overriding any project or CI-specific configuration. These proxies can hold
+newly published versions in quarantine for a configurable period before making them available for download. This works
+across ecosystems (npm, PyPI, Maven, and others) and ensures that even tools without native cooldown support benefit
+from a delay.
+
 ## Container images
 
 The configurations above work fine in your developer setups, but if you're building container images for development,
@@ -638,32 +649,65 @@ RUN cooldowns.sh check
 
 ## Quick reference
 
-| Package Manager | Cooldown support               | Configuration                                                     |
-|-----------------|--------------------------------|-------------------------------------------------------------------|
-| pip             | Relative durations (26.1+)     | `PIP_UPLOADED_PRIOR_TO="P3D"` / `--uploaded-prior-to P3D`         |
-| uv              | Relative durations             | `exclude-newer = "3 days"` in `uv.toml` / `pyproject.toml`        |
-| poetry          | Relative durations             | `solver.min-release-age=3` in `pyproject.toml`                    |
-| pixi            | Relative durations (0.67.0+)   | `exclude-newer = "3d"` in `pixi.toml`                             |
-| npm             | Relative durations             | `min-release-age=3` in `.npmrc`                                   |
-| pnpm            | Relative durations             | `minimumReleaseAge: 4320` in `pnpm-workspace.yaml`                |
-| Yarn            | Relative durations             | `npmMinimalAgeGate: "3d"` in `.yarnrc.yml`                        |
-| Bun             | Relative durations             | `minimumReleaseAge = 259200` in `bunfig.toml`                     |
-| Deno            | Relative durations             | `minimumDependencyAge: "P3D"` in `deno.json`                      |
-| Cargo           | Third-party only               | `cargo cooldown <cmd>` via `cargo-cooldown` crate                 |
-| Bundler         | Relative durations (4.0.13+)   | `bundle config set cooldown 3` / `--cooldown 3`                   |
-| Scala Steward   | Relative durations (0.38.0+)   | `updates.cooldown.minimumAge = "3 days"` in `.scala-steward.conf` |
-| VS Code         | Not available                  | Pin dependencies and review updates manually                      |
-| Go              | Not available                  | Dependabot/Renovate only                                          |
-| Maven/Gradle    | Not available                  | Dependabot/Renovate only                                          |
-| NuGet           | Not available                  | Dependabot/Renovate only                                          |
-| Composer        | Not available                  | Dependabot/Renovate only                                          |
+| Package Manager | Cooldown support                           | Configuration                                                     |
+| --------------- | ------------------------------------------ | ----------------------------------------------------------------- |
+| pip             | Relative durations (26.1+)                 | `PIP_UPLOADED_PRIOR_TO="P3D"` / `--uploaded-prior-to P3D`         |
+| uv              | Relative durations                         | `exclude-newer = "3 days"` in `uv.toml` / `pyproject.toml`        |
+| poetry          | Relative durations                         | `solver.min-release-age=3` in `pyproject.toml`                    |
+| pixi            | Relative durations (0.67.0+)               | `exclude-newer = "3d"` in `pixi.toml`                             |
+| npm             | Relative durations                         | `min-release-age=3` in `.npmrc`                                   |
+| pnpm            | Relative durations (1-day default in v11+) | `minimumReleaseAge: 4320` in `pnpm-workspace.yaml`                |
+| Yarn            | Relative durations                         | `npmMinimalAgeGate: "3d"` in `.yarnrc.yml`                        |
+| Bun             | Relative durations                         | `minimumReleaseAge = 259200` in `bunfig.toml`                     |
+| Deno            | Relative durations                         | `minimumDependencyAge: "P3D"` in `deno.json`                      |
+| Cargo           | Third-party only                           | `cargo cooldown <cmd>` via `cargo-cooldown` crate                 |
+| Bundler         | Relative durations (4.0.13+)               | `bundle config set cooldown 3` / `--cooldown 3`                   |
+| Scala Steward   | Relative durations (0.38.0+)               | `updates.cooldown.minimumAge = "3 days"` in `.scala-steward.conf` |
+| VS Code         | Not available                              | Pin dependencies and review updates manually                      |
+| Go              | Not available                              | Dependabot/Renovate only                                          |
+| Maven/Gradle    | Not available                              | Dependabot/Renovate only                                          |
+| NuGet           | Not available                              | Dependabot/Renovate only                                          |
+| Composer        | Not available                              | Dependabot/Renovate only                                          |
+
+## FAQ
+
+### Would cooldowns still work if everyone adopted them?
+
+Yes. Security vendors and researchers continuously scan newly published packages using automated static and dynamic
+analysis tools. They are not using cooldowns themselves; their entire purpose is to catch malicious releases as early as
+possible. When they flag a package, the registry pulls it, typically within hours. So even in a world where every
+developer uses cooldowns, malicious packages would still be detected and removed well before the cooldown window
+expires.
+
+### Don't cooldowns block security fixes?
+
+Cooldowns are one part of a secure supply chain, not the whole thing. The other part is active vulnerability
+scanning and dependency update bots. Both [Dependabot](https://docs.github.com/en/code-security/dependabot) and
+[Renovate](https://docs.renovatebot.com/) exempt security updates from cooldowns by default, so PRs for critical
+CVE fixes still arrive immediately. For manual workflows, most package managers let you bypass cooldowns on a
+per-package basis (pnpm's `minimumReleaseAgeExclude`, Yarn's `npmPreapprovedPackages`, uv's
+`exclude-newer-package`). Cooldowns are most valuable in environments where dependencies are unpinned and you
+always resolve to the latest version at install time. When a CVE needs an urgent fix, you momentarily override the
+cooldown for that specific package and move on.
+
+### Should cooldowns replace lockfiles?
+
+No. If your dependencies are locked (via `package-lock.json`, `uv.lock`, `poetry.lock`, etc.) and you only update
+the lockfile deliberately, you're already protected most of the time: you won't pull in a newly published malicious
+version unless you explicitly run an update. Cooldowns and lockfiles solve different problems. Lockfiles ensure
+reproducible installs; cooldowns protect the moment when you *do* resolve new versions. If you use automated
+dependency update bots like Renovate or Dependabot to keep your lockfile current, configure cooldowns in those tools
+so that new versions still go through a waiting period before a PR is opened.
 
 ## Conclusion
 
-It is worth noting that cooldowns don't protect against typosquatting, long-term maintainer compromise (like xz-utils),
-or zero-day vulnerabilities in packages you already have installed. And an aggressive cooldown can delay legitimate
-security patches, so pair cooldowns with active vulnerability alerting (`pip-audit`, `npm audit`, Dependabot security
-updates) to make sure critical fixes still reach you quickly.
+It is worth noting that cooldowns don't protect against typosquatting, long-term maintainer compromise, or zero-day
+vulnerabilities in packages you already have installed. Attacks like the xz-utils compromise, where a trusted maintainer
+introduced a backdoor over the course of months, are fundamentally different from the compromises that cooldowns target.
+Those attacks are also rare and require a much higher level of sophistication; they are better addressed by code review,
+reproducible builds, and distribution-level auditing. A cooldown can also delay legitimate security patches, so pair
+cooldowns with active vulnerability alerting (`pip-audit`, `npm audit`, Dependabot security updates) to make sure
+critical fixes still reach you quickly.
 
 That said, most real-world package compromises follow the same pattern: an attacker publishes a malicious version, and
 it gets caught and pulled within hours or days. A three-day cooldown would have blocked the majority of recent incidents
