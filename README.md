@@ -402,6 +402,51 @@ Bundler fails open: it only holds back versions it can prove are too new. Versio
 [RubyGems blog announcement](https://blog.rubygems.org/2026/06/03/cooldown-let-new-gems-be-vetted.html) for more
 information.
 
+## Elixir Ecosystem
+
+### Hex
+
+[Hex](https://hex.pm/) merged a built-in cooldown feature in [pull request #1160](https://github.com/hexpm/hex/pull/1160);
+it will be available in the next Hex release after v2.4.2. The `cooldown` config key accepts duration strings in the form
+`<N>d` (days), `<N>w` (weeks), or `<N>mo` (months). To set a global three-day cooldown:
+
+```bash
+mix hex.config cooldown 3d
+```
+
+Or as an environment variable:
+
+```bash
+export HEX_COOLDOWN="3d"
+```
+
+For project-level configuration in `mix.exs`:
+
+```elixir
+def project do
+  [
+    # ...
+    hex: [cooldown: "3d"]
+  ]
+end
+```
+
+To exclude specific repositories from the cooldown (useful when an organization publishes hotfixes to its own repo):
+
+```bash
+mix hex.config cooldown_exclude_repos '["hexpm:myorg"]'
+```
+
+Or as an environment variable (comma-separated):
+
+```bash
+export HEX_COOLDOWN_EXCLUDE_REPOS="hexpm:myorg"
+```
+
+Hex fails open: releases without a `published_at` timestamp (legacy registry data, repos that haven't rebuilt their
+index) remain resolvable. Packages already present in the lockfile bypass the cooldown entirely, and packages locked
+to a version that is retired or has a security advisory are allowed to re-resolve even during cooldown.
+
 ## Scala / JVM Ecosystem
 
 ### Scala Steward
@@ -460,9 +505,9 @@ and pin extension versions where possible.
 
 These language ecosystems currently offer no native cooldown support. There's
 an [open proposal](https://github.com/golang/go/issues/76485) for Go, but it hasn't
-been accepted. [NuGet](https://github.com/NuGet/Home/issues/14657),
-[Composer](https://github.com/composer/composer/issues/12633), and
-[Hex](https://github.com/hexpm/hex/issues/1113) also have open feature requests. Swift Package Manager doesn't have
+been accepted. [NuGet](https://github.com/NuGet/Home/issues/14657) and
+[Composer](https://github.com/composer/composer/issues/12633) also have open feature requests.
+Swift Package Manager doesn't have
 native cooldowns either, and no open request exists requesting this feature as of today. Your best bet is
 locking your dependencies to exact versions, and configuring cooldowns in Dependabot or Renovate for automated updates
 (see below).
@@ -662,6 +707,7 @@ RUN cooldowns.sh check
 | Deno            | Relative durations                         | `minimumDependencyAge: "P3D"` in `deno.json`                      |
 | Cargo           | Third-party only                           | `cargo cooldown <cmd>` via `cargo-cooldown` crate                 |
 | Bundler         | Relative durations (4.0.13+)               | `bundle config set cooldown 3` / `--cooldown 3`                   |
+| Hex             | Relative durations (unreleased)            | `mix hex.config cooldown 3d` / `HEX_COOLDOWN="3d"`                |
 | Scala Steward   | Relative durations (0.38.0+)               | `updates.cooldown.minimumAge = "3 days"` in `.scala-steward.conf` |
 | VS Code         | Not available                              | Pin dependencies and review updates manually                      |
 | Go              | Not available                              | Dependabot/Renovate only                                          |
@@ -715,6 +761,7 @@ with zero ongoing effort after initial setup. Pick a number, configure it, and s
 
 ## Changelog
 
+- **2026-06-12**: Added Hex (Elixir) cooldown documentation.
 - **2026-06-03**: Added Bundler (RubyGems) cooldown documentation.
 - **2026-06-01**: Added VS Code documentation.
 - **2026-05-27**: Added Scala Steward cooldown documentation.
