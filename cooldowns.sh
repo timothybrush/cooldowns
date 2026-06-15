@@ -52,16 +52,25 @@ set -euo pipefail
 #   date_to_epoch    YYYY-MM-DD -> epoch seconds
 #   _date_days_ago   emits a `date ...` command string for "N days ago in UTC"
 #   copy_mode_from   chmod DEST to SRC's mode (mktemp files are often 0600)
+# Detect sed FLAVOR (not OS) -- BSD and GNU sed disagree on -i semantics:
+#   BSD sed:  -i SUFFIX     ('' means no backup, requires the empty arg)
+#   GNU sed:  -i[SUFFIX]    (no space; passing -i '' treats '' as the script)
+# Macs commonly have GNU sed in PATH (brew install gnu-sed), so OSTYPE alone
+# is not enough -- ask sed itself.
+if sed --version 2>/dev/null | grep -q "GNU sed"; then
+    SED_INPLACE=(sed -i)
+else
+    SED_INPLACE=(sed -i '')
+fi
+
 case "$OSTYPE" in
     darwin*|*bsd*)
-        SED_INPLACE=(sed -i '')
         date_to_epoch()   { date -j -f '%Y-%m-%d' "$1" +%s 2>/dev/null || echo ""; }
         _date_days_ago()  { echo "date -u -v-${1}d '+%Y-%m-%dT%H:%M:%SZ'"; }
         # macOS chmod has no --reference; %OLp is permission bits (not full st_mode).
         copy_mode_from() { local src="$1" dest="$2"; chmod "$(stat -f %OLp "$src")" "$dest"; }
         ;;
     *)
-        SED_INPLACE=(sed -i)
         date_to_epoch()   { date -d "$1" +%s 2>/dev/null || echo ""; }
         _date_days_ago()  { echo "date -u -d '$1 days ago' '+%Y-%m-%dT%H:%M:%SZ'"; }
         # GNU chmod: clone mode from SRC (see `chmod --help`).
