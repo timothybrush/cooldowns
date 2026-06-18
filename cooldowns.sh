@@ -268,7 +268,7 @@ SHELL
 
         cat >> "$PROFILE_SCRIPT" << SHELL
 # cooldowns:pip:start
-pip() {
+${pip_for_command}() {
     local pip_major cutoff
     pip_major=\$(command ${pip_for_command} --version 2>/dev/null | awk '{ split(\$2, a, "."); print a[1]; exit }')
     case "\$1" in
@@ -774,7 +774,8 @@ tool_is_relevant() {
     command -v "$tool" &>/dev/null && return 0
     find_in_profiles "cooldowns:${tool}:start" &>/dev/null && return 0
     case "$tool" in
-        pip)   [[ -f "${HOME}/.config/pip/pip.conf" || -f "${HOME}/.pip/pip.conf" || -n "${PIP_UPLOADED_PRIOR_TO:-}" ]] && return 0
+        pip)   command -v pip3 &>/dev/null && return 0
+               [[ -f "${HOME}/.config/pip/pip.conf" || -f "${HOME}/.pip/pip.conf" || -n "${PIP_UPLOADED_PRIOR_TO:-}" ]] && return 0
                find_in_profiles "PIP_UPLOADED_PRIOR_TO=" &>/dev/null && return 0 ;;
         uv)    [[ -f "${HOME}/.config/uv/uv.toml" || -n "${UV_EXCLUDE_NEWER:-}" ]] && return 0
                find_in_profiles "UV_EXCLUDE_NEWER=" &>/dev/null && return 0 ;;
