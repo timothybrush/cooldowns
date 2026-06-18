@@ -66,7 +66,16 @@ For project-level config in `pyproject.toml`:
 exclude-newer = "3 days"
 ```
 
-uv also supports per-package overrides via `exclude-newer-package` if you need to exempt specific packages.
+uv also supports per-package overrides via `exclude-newer-package`. To exempt a specific package from the cooldown
+(e.g. to pull an urgent security fix), set it to `false` in your `pyproject.toml` or `uv.toml`:
+
+```toml
+[tool.uv]
+exclude-newer = "3 days"
+exclude-newer-package = { setuptools = false }
+```
+
+There is no CLI flag or environment variable for `exclude-newer-package`; it can only be set in a config file.
 
 Refer to [uv documentation](https://docs.astral.sh/uv/reference/settings/#exclude-newer) for more information about this
 configuration setting.
@@ -92,6 +101,15 @@ Or in `~/.config/pip/pip.conf`:
 [install]
 uploaded-prior-to = P3D
 ```
+
+pip does not support per-package exemptions. To bypass the cooldown for an urgent fix, install the specific package
+in a separate command with the environment variable unset:
+
+```bash
+env -u PIP_UPLOADED_PRIOR_TO pip install setuptools==78.1.1
+```
+
+If you use the shell wrapper function from the [pip < 26.1](#pip--261) section, call `command pip` directly to bypass it.
 
 See [pip documentation](https://pip.pypa.io/en/stable/cli/pip_install/#cmdoption-uploaded-prior-to) for more information
 about this configuration option.
@@ -196,6 +214,24 @@ You can also set the following in your project's `pyproject.toml` or in `~/.conf
 min-release-age = 3
 ```
 
+To exempt specific packages from the cooldown (e.g. for an urgent CVE fix):
+
+```bash
+poetry config solver.min-release-age-exclude "setuptools,requests"
+```
+
+Or via environment variable:
+
+```bash
+export POETRY_SOLVER_MIN_RELEASE_AGE_EXCLUDE="setuptools,requests"
+```
+
+You can also exempt all packages from a specific source (useful for private registries):
+
+```bash
+poetry config solver.min-release-age-exclude-source "private-repo"
+```
+
 If the package registry does not expose upload times for a release, `poetry` fails open and will allow a release to be installed.
 See [Private PyPI registries](#private-pypi-registries).
 
@@ -224,7 +260,17 @@ exclude-newer = "3d"
 ```
 
 Per-package overrides are available via the `[exclude-newer]` table for conda packages and `[pypi-exclude-newer]`
-for PyPI packages. For more advanced settings, the
+for PyPI packages. To exempt a specific package from the cooldown, set it to `"0d"`:
+
+```ini
+[workspace]
+exclude-newer = "3d"
+
+[pypi-exclude-newer]
+torch = "0d"
+```
+
+For more advanced settings (e.g. per-channel overrides), the
 [docs](https://pixi.prefix.dev/latest/security/#2-delay-fresh-uploads-with-exclude-newer) describe how to allow
 trusted internal channels or urgent fixes.
 
@@ -256,7 +302,8 @@ min-release-age = 3 # days
 `npm` chose to use a unit that represents the number of days that a release must be
 available before it will be considered for installation. In true JavaScript fashion, the other JS package managers chose
 completely different units of time. Unlike pnpm and Yarn (see below), npm doesn't yet have a way to
-exempt specific packages from the cooldown.
+exempt specific packages from the cooldown. To bypass the cooldown for an urgent fix, you can temporarily override it
+for the entire install by passing `--min-release-age=0` on the command line.
 See [npm documentation](https://docs.npmjs.com/cli/v11/using-npm/config#min-release-age) for more information.
 
 ### pnpm (JavaScript/Node.js)
@@ -311,6 +358,14 @@ Bun supports cooldowns with the `minimumReleaseAge` configuration option in `bun
 minimumReleaseAge = 259200 # 3 days
 ```
 
+To exempt specific packages from the cooldown:
+
+```toml
+[install]
+minimumReleaseAge = 259200 # 3 days
+minimumReleaseAgeExcludes = ["@types/node", "typescript"]
+```
+
 For more information, see [bun documentation](https://bun.com/docs/pm/cli/install#minimum-release-age).
 
 ### Deno (JavaScript/TypeScript)
@@ -331,6 +386,17 @@ Or use the `--minimum-dependency-age` flag:
 deno install --minimum-dependency-age=P3D
 deno update --minimum-dependency-age=P3D
 deno outdated --minimum-dependency-age=P3D
+```
+
+To exempt specific packages from the cooldown, use the object form:
+
+```json
+{
+  "minimumDependencyAge": {
+    "age": "P3D",
+    "exclude": ["npm:@mycompany/cli", "jsr:@mycompany/lib"]
+  }
+}
 ```
 
 See [deno documentation](https://docs.deno.com/runtime/reference/cli/install/#options-minimum-dependency-age) for more
@@ -354,6 +420,22 @@ does nothing; it is only read by the `cargo-cooldown` subcommand.
 cargo install cargo-cooldown
 export COOLDOWN_MINUTES=4320  # 3 days, in minutes
 cargo cooldown build
+```
+
+To exempt a specific crate from the cooldown, add an `[[allow.package]]` entry to `cooldown.toml`:
+
+```toml
+[[allow.package]]
+crate = "openssl"
+min-publish-age = "0"
+```
+
+Or allow a specific crate version with `[[allow.exact]]`:
+
+```toml
+[[allow.exact]]
+crate = "serde"
+version = "1.0.218"
 ```
 
 ## Ruby Ecosystem
@@ -395,7 +477,20 @@ export BUNDLE_COOLDOWN=3
 ```
 
 When multiple settings apply, the override hierarchy is: command-line flag > configuration setting > per-source
-`Gemfile` declaration. Passing `0` disables the cooldown for that run.
+`Gemfile` declaration. Passing `--cooldown 0` disables the cooldown for all gems in that run:
+
+```bash
+bundle install --cooldown 0
+```
+
+There is no per-gem exemption, but you can set a per-source override in the `Gemfile` to exempt all gems from a
+specific source (e.g. a private registry):
+
+```ruby
+source "https://gems.internal.example.com", cooldown: 0 do
+  gem "internal-tool"
+end
+```
 
 Bundler fails open: it only holds back versions it can prove are too new. Versions lacking a `created_at` timestamp
 (older servers, v1-format registries, some private gems) remain resolvable. See the
@@ -715,6 +810,36 @@ RUN cooldowns.sh check
 | NuGet           | Not available                              | Dependabot/Renovate only                                          |
 | Composer        | Not available                              | Dependabot/Renovate only                                          |
 
+## Bypassing cooldowns
+
+When a vulnerability is disclosed and a fix is already available, you may need to pull a specific package immediately
+without waiting for the cooldown to expire. Most package managers provide a way to exempt individual packages or
+disable the cooldown for a single run. The table below summarizes the bypass mechanism for each tool:
+
+| Package Manager | Per-package bypass | How to bypass                                                           |
+| --------------- | ------------------ | ----------------------------------------------------------------------- |
+| pip             | No                 | Unset env var or override on CLI; see [pip section](#pip)               |
+| uv              | Yes                | `exclude-newer-package = { pkg = false }` in config file                |
+| poetry          | Yes                | `solver.min-release-age-exclude = "pkg"` or env var                     |
+| pixi            | Yes                | `[pypi-exclude-newer]` / `[exclude-newer]` table, set to `"0d"`         |
+| npm             | No                 | Pass `--min-release-age=0` on the command line                          |
+| pnpm            | Yes                | `minimumReleaseAgeExclude` list (supports globs and version pins)       |
+| Yarn            | Yes                | `npmPreapprovedPackages` list (supports globs)                          |
+| Bun             | Yes                | `minimumReleaseAgeExcludes` list in `bunfig.toml`                       |
+| Deno            | Yes                | Object form with `exclude` array in `deno.json`                         |
+| Cargo           | Yes                | `[[allow.package]]` / `[[allow.exact]]` in `cooldown.toml`              |
+| Bundler         | Per-run only       | `--cooldown 0` disables for entire run; per-source in `Gemfile`         |
+| Hex             | Per-repo only      | `cooldown_exclude_repos` exempts entire repositories                    |
+| Scala Steward   | Yes                | `dependencyOverrides` with per-dependency `cooldown.minimumAge`         |
+
+**Important:** always revert bypass exemptions after installing the fix. A forgotten entry in a config file
+permanently weakens your cooldown protection for that package. For tools with per-package support, add the
+exemption, install the fix, then remove it. For tools without per-package support (pip, npm), temporarily override
+the cooldown for the entire install command and pin the version you need.
+Both [Renovate](https://docs.renovatebot.com/) and [Dependabot](https://docs.github.com/en/code-security/dependabot)
+exempt security updates from cooldowns by default, so CVE fix PRs still arrive immediately regardless of your cooldown
+configuration.
+
 ## FAQ
 
 ### Would cooldowns still work if everyone adopted them?
@@ -731,10 +856,8 @@ Cooldowns are one part of a secure supply chain, not the whole thing. The other 
 scanning and dependency update bots. Both [Dependabot](https://docs.github.com/en/code-security/dependabot) and
 [Renovate](https://docs.renovatebot.com/) exempt security updates from cooldowns by default, so PRs for critical
 CVE fixes still arrive immediately. For manual workflows, most package managers let you bypass cooldowns on a
-per-package basis (pnpm's `minimumReleaseAgeExclude`, Yarn's `npmPreapprovedPackages`, uv's
-`exclude-newer-package`). Cooldowns are most valuable in environments where dependencies are unpinned and you
-always resolve to the latest version at install time. When a CVE needs an urgent fix, you momentarily override the
-cooldown for that specific package and move on.
+per-package basis. When a CVE needs an urgent fix, you momentarily override the cooldown for that specific package,
+install the fix, and remove the exemption. See [Bypassing cooldowns](#bypassing-cooldowns) for per-tool syntax.
 
 ### Should cooldowns replace lockfiles?
 
@@ -761,6 +884,7 @@ with zero ongoing effort after initial setup. Pick a number, configure it, and s
 
 ## Changelog
 
+- **2026-06-18**: Added per-package bypass documentation.
 - **2026-06-12**: Added Hex (Elixir) cooldown documentation.
 - **2026-06-03**: Added Bundler (RubyGems) cooldown documentation.
 - **2026-06-01**: Added VS Code documentation.
