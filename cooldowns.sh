@@ -824,6 +824,13 @@ check_pnpm() {
         record pnpm $STATUS_OK "minimum-release-age=$val (pnpm global config)"
         return
     fi
+    # pnpm v11+ ships a built-in default of 1440 minutes (1 day)
+    local pnpm_ver
+    pnpm_ver=$(pnpm --version 2>/dev/null)
+    if [[ -n "$pnpm_ver" ]] && version_gte "$pnpm_ver" "11.0.0"; then
+        record pnpm $STATUS_OK "v11+ built-in default (1440 min / 1 day)"
+        return
+    fi
     record pnpm $STATUS_MISSING "no cooldown configured"
 }
 

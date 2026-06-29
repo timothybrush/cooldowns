@@ -308,25 +308,40 @@ See [npm documentation](https://docs.npmjs.com/cli/v11/using-npm/config#min-rele
 
 ### pnpm (JavaScript/Node.js)
 
-pnpm 10.16.0 added `minimumReleaseAge` to support cooldowns. Since pnpm v11, a default cooldown of 1440 minutes (one
-day) is enabled out of the box. To increase it to three days, add the following to your `~/.config/pnpm/rc` file (or the
-equivalent project-specific configuration file):
+pnpm added cooldown support via `minimumReleaseAge` in version 10.16.0. The value represents the number of minutes a
+release must be available before it is installed. The configuration approach differs between v10 and v11.
+
+#### pnpm v11+
+
+Since v11, a default cooldown of 1440 minutes (one day) is enabled out of the box. All non-authentication settings
+belong in `pnpm-workspace.yaml` (`.npmrc` is reserved for authentication only). To increase the cooldown to three days:
 
 ```yaml
 minimumReleaseAge: 4320 # 3 days
 ```
 
-The value represents the number of minutes a release must be available before it is installed. You can also exclude
-specific packages from this policy with:
+You can exclude specific packages from the cooldown:
 
 ```yaml
-minimumReleaseAge: 4320 # 3 days
 minimumReleaseAgeExclude:
 - webpack
 - react
 ```
 
 See [pnpm documentation](https://pnpm.io/settings#minimumreleaseage) for more information.
+
+#### pnpm v10
+
+The default cooldown in v10 is 0 (disabled). To enable a three-day cooldown, add the following to your project's
+`.npmrc`:
+
+```ini
+minimum-release-age=4320
+```
+
+Alternatively, you can configure it in `pnpm-workspace.yaml` using the camelCase form shown in the v11 section above.
+The exclude list (`minimumReleaseAgeExclude`) requires `pnpm-workspace.yaml`.
+See [pnpm v10 documentation](https://pnpm.io/10.x/settings#minimumreleaseage) for more information.
 
 ### Yarn (JavaScript/Node.js)
 
